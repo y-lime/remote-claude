@@ -26,5 +26,8 @@
       "extensions": ["anthropic.claude-code"]
     }
   },
-  "remoteUser": "vscode"
+  "remoteUser": "vscode",
+
+  // VS Code のウィンドウを閉じてもコンテナを止めない（中の tmux や claude を動かし続ける）
+  "shutdownAction": "none"
 }
