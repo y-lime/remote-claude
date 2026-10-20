@@ -1,0 +1,30 @@
+// remote-claude の EC2 上で動かす devcontainer のひな形。アプリのリポジトリに .devcontainer/ ごとコピーして使う
+{
+  "name": "remote-claude",
+  "image": "mcr.microsoft.com/devcontainers/base:noble",
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": { "version": "24" },
+    "ghcr.io/devcontainers/features/aws-cli:1": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+    // Java（Amazon Corretto）が必要なプロジェクトでは有効にする
+    // , "ghcr.io/devcontainers/features/java:1": { "version": "21", "jdkDistro": "amzn" }
+  },
+
+  // EC2 の Bedrock の設定（/etc/remote-claude/claude.env）をそのまま渡す。
+  // AWS の認証情報は IMDS からインスタンスロールのものを取る（ホップ数 2 にしてある）
+  "runArgs": ["--env-file", "/etc/remote-claude/claude.env"],
+
+  // Claude Code の設定と履歴は名前付きボリュームに置き、コンテナを作り直しても残す（プロジェクト間で共有）
+  "mounts": ["source=remote-claude-config,target=/home/vscode/.claude,type=volume"],
+  "containerEnv": { "CLAUDE_CONFIG_DIR": "/home/vscode/.claude" },
+  "remoteEnv": { "PATH": "/home/vscode/.local/bin:${containerEnv:PATH}" },
+
+  "postCreateCommand": "sudo chown vscode:vscode /home/vscode/.claude && curl -fsSL https://claude.ai/install.sh | bash",
+
+  "customizations": {
+    "vscode": {
+      "extensions": ["anthropic.claude-code"]
+    }
+  },
+  "remoteUser": "vscode"
+}
