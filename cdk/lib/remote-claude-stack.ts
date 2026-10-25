@@ -85,17 +85,45 @@ export class RemoteClaudeStack extends cdk.Stack {
       resources: ['*'],
     }));
 
+    // CodeArtifact は読み取りだけ。publish は手元からユーザー自身の権限で行う
+    const caOwner = config.codeArtifactDomainOwner ?? this.account;
+    role.addToPolicy(new iam.PolicyStatement({
+      sid: 'CodeArtifactToken',
+      actions: ['codeartifact:GetAuthorizationToken'],
+      resources: [`arn:aws:codeartifact:${this.region}:${caOwner}:domain/${config.codeArtifactDomain}`],
+    }));
+    role.addToPolicy(new iam.PolicyStatement({
+      sid: 'CodeArtifactRead',
+      actions: ['codeartifact:GetRepositoryEndpoint', 'codeartifact:ReadFromRepository'],
+      resources: [`arn:aws:codeartifact:${this.region}:${caOwner}:repository/${config.codeArtifactDomain}/*`],
+    }));
+    role.addToPolicy(new iam.PolicyStatement({
+      sid: 'CodeArtifactBearerToken',
+      actions: ['sts:GetServiceBearerToken'],
+      resources: ['*'],
+      conditions: { StringEquals: { 'sts:AWSServiceName': 'codeartifact.amazonaws.com' } },
+    }));
+
     // ---- EC2 ----
     const asset = (name: string) => fs.readFileSync(path.join(__dirname, '..', 'assets', name), 'utf8');
+    const caUrl = `https://${config.codeArtifactDomain}-${caOwner}.d.codeartifact.${this.region}.amazonaws.com`
+      + `/maven/${config.codeArtifactRepository}/`;
     const userData = ec2.UserData.forLinux();
     userData.addCommands(
-      [asset('user-data.sh'), asset('setup-claude.sh')].join('\n')
+      [asset('user-data.sh'), asset('setup-claude.sh'), asset('setup-java.sh')].join('\n')
         .replaceAll('__SSH_PUBLIC_KEY__', config.sshPublicKey ?? '')
         .replaceAll('__AWS_REGION__', this.region)
         .replaceAll('__CLAUDE_MODEL__', config.claudeModel)
         .replaceAll('__CLAUDE_OPUS_MODEL__', config.claudeOpusModel)
         .replaceAll('__CLAUDE_SONNET_MODEL__', config.claudeSonnetModel)
-        .replaceAll('__CLAUDE_HAIKU_MODEL__', config.claudeHaikuModel),
+        .replaceAll('__CLAUDE_HAIKU_MODEL__', config.claudeHaikuModel)
+        .replaceAll('__CODEARTIFACT_DOMAIN__', config.codeArtifactDomain)
+        .replaceAll('__CODEARTIFACT_DOMAIN_OWNER__', caOwner)
+        .replaceAll('__CODEARTIFACT_URL__', caUrl)
+        .replaceAll('__JAVA_VERSION__', config.javaVersion)
+        .replaceAll('__GRADLE_VERSION__', config.gradleVersion)
+        // 置換文字列の $ を特殊文字として扱わせないため関数で渡す
+        .replaceAll('__GRADLE_INIT_SCRIPT__', () => asset('codeartifact.init.gradle.kts').trimEnd()),
     );
     if (!config.sshPublicKey) {
       cdk.Annotations.of(this).addWarningV2('remote-claude:no-ssh-key',

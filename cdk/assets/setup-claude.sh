@@ -2,7 +2,7 @@
 # Claude Code（ネイティブ版）を ec2-user に入れて、Bedrock を使う設定をする。何度実行してもよい
 set -euxo pipefail
 
-# Bedrock の設定。ホストのシェル（profile.d）と devcontainer（runArgs の --env-file）の両方から読む
+# Bedrock と CodeArtifact の設定。ホストのシェル（profile.d）と devcontainer（runArgs の --env-file）の両方から読む
 install -d -m 755 /etc/remote-claude
 cat > /etc/remote-claude/claude.env <<'EOF'
 CLAUDE_CODE_USE_BEDROCK=1
@@ -11,6 +11,9 @@ ANTHROPIC_MODEL=__CLAUDE_MODEL__
 ANTHROPIC_DEFAULT_OPUS_MODEL=__CLAUDE_OPUS_MODEL__
 ANTHROPIC_DEFAULT_SONNET_MODEL=__CLAUDE_SONNET_MODEL__
 ANTHROPIC_DEFAULT_HAIKU_MODEL=__CLAUDE_HAIKU_MODEL__
+CODEARTIFACT_DOMAIN=__CODEARTIFACT_DOMAIN__
+CODEARTIFACT_DOMAIN_OWNER=__CODEARTIFACT_DOMAIN_OWNER__
+CODEARTIFACT_URL=__CODEARTIFACT_URL__
 EOF
 chmod 644 /etc/remote-claude/claude.env
 
