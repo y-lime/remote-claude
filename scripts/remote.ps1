@@ -6,6 +6,7 @@
   remote.ps1 status             状態を表示する
   remote.ps1 ssh [ssh の引数]   止まっていたら起動してから ssh で接続する（~/.ssh/config の Host remote-claude を使う）
   remote.ps1 shell              止まっていたら起動してから SSM で ec2-user のシェルを開く（SSH 鍵は不要）
+  remote.ps1 tmux [名前]        shell と同じだが、tmux のセッションに入る（既定 main。なければ作る。切断しても作業が続く）
   remote.ps1 ssh-config         ~/.ssh/config に追記する設定を表示する
   remote.ps1 proxy <id> <port>  ssh の ProxyCommand 用。止まっていたら起動してから SSH over SSM をつなぐ
 
@@ -110,7 +111,8 @@ Host $HostAlias
 }
 
 $Command = if ($args.Count -gt 0) { $args[0] } else { 'help' }
-$Rest = if ($args.Count -gt 1) { $args[1..($args.Count - 1)] } else { @() }
+# 要素が1つでも配列にする（if の結果は1要素だと文字列にほどけ、$Rest[0] が先頭の1文字になる）
+$Rest = @(if ($args.Count -gt 1) { $args[1..($args.Count - 1)] })
 
 try {
   switch ($Command) {
@@ -135,12 +137,19 @@ try {
       & ssh $HostAlias @Rest
       exit $LASTEXITCODE
     }
-    'shell' {
+    { $_ -in 'shell', 'tmux' } {
+      # 既定の ssm-user ではなく、Claude Code を入れてある ec2-user のログインシェルで開く
+      $remoteCommand = 'sudo -iu ec2-user'
+      if ($Command -eq 'tmux') {
+        $session = if ($Rest.Count -gt 0) { $Rest[0] } else { 'main' }
+        # リモートのシェルにそのまま渡るので、使える文字を絞る（tmux はセッション名の . と : を受け付けない）
+        if ($session -notmatch '^[A-Za-z0-9_-]+$') { throw "セッション名に使えるのは英数字、_、- だけです: $session" }
+        $remoteCommand += " tmux new -As $session"
+      }
       $id = Get-InstanceId
       Start-Remote $id
-      # 既定の ssm-user ではなく、Claude Code を入れてある ec2-user のログインシェルで開く
       & aws ssm start-session --target $id --region $Region `
-        --document-name AWS-StartInteractiveCommand --parameters 'command=sudo -iu ec2-user'
+        --document-name AWS-StartInteractiveCommand --parameters "command=$remoteCommand"
       exit $LASTEXITCODE
     }
     'ssh-config' { Show-SshConfig (Get-InstanceId) }

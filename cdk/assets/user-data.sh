@@ -24,6 +24,12 @@ if [ -n "$SSH_PUBLIC_KEY" ]; then
   chmod 600 /home/ec2-user/.ssh/authorized_keys
 fi
 
+# SSM 越しだと、tmux が接続時に端末へ問い合わせた返事（画面サイズや色）が既定の 10ms に間に合わず、
+# 「10;rgb:...」のような文字列が入力として入ってしまう。待ち時間を延ばす
+cat > /etc/tmux.conf <<'EOF'
+set -sg escape-time 200
+EOF
+
 # 作業ディレクトリ（リポジトリの clone 先）
 install -d -o ec2-user -g ec2-user /work
 
