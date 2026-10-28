@@ -5,8 +5,10 @@ set -euxo pipefail
 
 timedatectl set-timezone Asia/Tokyo
 
-# nodejs24 は devcontainer CLI 用
-dnf install -y docker git tmux jq nodejs24 nodejs24-npm
+# nodejs24 は devcontainer CLI 用。ほかはホストでリポジトリやコンテナを扱うときのコマンド
+# curl は入れない（AL2023 は curl-minimal が入っていて、curl を指定すると衝突して失敗する）
+dnf install -y docker git tmux jq nodejs24 nodejs24-npm \
+  git-lfs rsync unzip zip tree htop lsof vim-enhanced emacs-nox
 
 # devcontainer は shutdownAction: none で動かし続けるので、コンテナのログが EBS を食いつぶさないようにする
 install -d /etc/docker

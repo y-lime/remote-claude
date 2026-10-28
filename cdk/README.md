@@ -7,7 +7,7 @@ Claude Code を常駐させるリモート環境（AWS EC2 1台）を作る CDK�
 
 構成図：[docs/architecture.drawio](docs/architecture.drawio)（`egress=nat` の場合。draw.io か VS Code の Draw.io Integration 拡張で開く）
 
-- EC2（Amazon Linux 2023、t3.large、EBS gp3 100GB 暗号化）。開発は devcontainer（[devcontainer-template/](../devcontainer-template/README.md)）の中で行う前提で、ホストには Docker、docker compose、devcontainer CLI、git、tmux、jq だけを初回起動時に入れる（`assets/user-data.sh`）。Claude Code、Java、Gradle はホストには入れない
+- EC2（Amazon Linux 2023、t3.large、EBS gp3 100GB 暗号化）。開発は devcontainer（[devcontainer-template/](../devcontainer-template/README.md)）の中で行う前提で、ホストには Docker、docker compose、devcontainer CLI と、git、git-lfs、tmux、jq、rsync、zip / unzip、tree、htop、lsof、vim、emacs（nox）などのコマンドだけを初回起動時に入れる（`assets/user-data.sh`）。Claude Code、Java、Gradle はホストには入れない
 - コンテナのログは 10MB × 3 ファイルでローテーションする（`/etc/docker/daemon.json`）
 - devcontainer のベースイメージ（`mcr.microsoft.com/devcontainers/base:noble`）を初回起動時に pull しておく。`devcontainer-template` の `image` を変えたら `assets/user-data.sh` もそろえる（テストで確認する）
 - devcontainer に渡す設定（Bedrock と CodeArtifact の環境変数 `/etc/remote-claude/claude.env`、Gradle の init スクリプト `/etc/remote-claude/gradle/`）を置く（`assets/setup-devcontainer.sh`）
