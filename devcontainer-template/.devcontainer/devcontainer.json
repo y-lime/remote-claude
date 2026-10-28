@@ -6,7 +6,7 @@
     "ghcr.io/devcontainers/features/node:1": { "version": "24" },
     "ghcr.io/devcontainers/features/aws-cli:1": {},
     "ghcr.io/devcontainers/features/github-cli:1": {},
-    // Java（Amazon Corretto）と Gradle。EC2 のホストと同じバージョンにそろえる（cdk.json の javaVersion / gradleVersion）
+    // Java（Amazon Corretto）と Gradle。EC2 のホストには入れないので、バージョンはここで決める
     "ghcr.io/devcontainers/features/java:1": {
       "version": "25", "jdkDistro": "amzn", "installGradle": true, "gradleVersion": "9.8.2"
     }
@@ -19,7 +19,7 @@
   "mounts": [
     // Claude Code の設定と履歴は名前付きボリュームに置き、コンテナを作り直しても残す（プロジェクト間で共有）
     "source=remote-claude-config,target=/home/vscode/.claude,type=volume",
-    // Gradle が CodeArtifact を見るようにする init スクリプト（EC2 のホストと共通）
+    // Gradle が CodeArtifact を見るようにする init スクリプト（EC2 の user data が置く）
     "source=/etc/remote-claude/gradle,target=/home/vscode/.gradle/init.d,type=bind,readonly",
     // 依存ライブラリのキャッシュ。コンテナを作り直しても取り直さない
     "source=remote-claude-gradle,target=/home/vscode/.gradle/caches,type=volume"

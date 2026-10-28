@@ -20,7 +20,7 @@ scripts\remote.cmd ssh          # 止まっていたら起動して、ssh remote
 scripts\remote.cmd ssh-config   # ~/.ssh/config に追記する設定を表示する
 ```
 
-VS Code の拡張機能（Remote-SSH、Dev Containers）がなくても、`tmux` だけで作業できる。`tmux` で入って `claude` や `gradle` を動かし、ウィンドウを閉じても処理は続く。次に `scripts\remote.cmd tmux` を実行すると同じ画面に戻る（tmux の中から抜けるときは `Ctrl-b d`）。
+開発は devcontainer の中で行う（EC2 のホストには Claude Code、Java、Gradle を入れない）。VS Code の拡張機能（Remote-SSH、Dev Containers）がなくても、`tmux` で入って devcontainer CLI でコンテナに入れば作業できる（[devcontainer-template/](devcontainer-template/README.md#vs-code-の拡張機能なしで使うdevcontainer-cli)）。ウィンドウを閉じても処理は続く。次に `scripts\remote.cmd tmux` を実行すると同じ画面に戻る（tmux の中から抜けるときは `Ctrl-b d`）。
 
 インスタンス ID は CloudFormation スタック（`RemoteClaudeStack`）の出力から取る。リージョン、スタック名、インスタンス ID は環境変数 `REMOTE_CLAUDE_REGION`、`REMOTE_CLAUDE_STACK`、`REMOTE_CLAUDE_INSTANCE_ID` で上書きできる。
 

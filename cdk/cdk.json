@@ -26,8 +26,6 @@
     "claudeOpusModel": "global.anthropic.claude-opus-4-6-v1",
     "claudeSonnetModel": "jp.anthropic.claude-sonnet-4-6",
     "claudeHaikuModel": "jp.anthropic.claude-haiku-4-5-20251001-v1:0",
-    "javaVersion": "25",
-    "gradleVersion": "9.8.2",
     "codeArtifactCreate": true,
     "codeArtifactDomain": "remote-claude",
     "codeArtifactRepository": "libs",

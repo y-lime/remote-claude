@@ -6,7 +6,6 @@ remote-claude の EC2 上で動かす devcontainer。アプリのリポジトリ
 - Bedrock と CodeArtifact の設定は、EC2 の `/etc/remote-claude/claude.env` を `--env-file` で渡す。AWS の認証情報は IMDS からインスタンスロールのものを取るので、コンテナにキーは置かない
 - Gradle は、EC2 の `/etc/remote-claude/gradle`（CodeArtifact を使う init スクリプト）を `~/.gradle/init.d` にマウントして使う。依存ライブラリのキャッシュは名前付きボリューム `remote-claude-gradle` に置く
 - Claude Code の設定と履歴は、名前付きボリューム `remote-claude-config` に置く。コンテナを作り直しても残り、プロジェクト間で共有する
-- Java と Gradle のバージョンは、EC2 のホスト（`cdk/cdk.json` の `javaVersion` と `gradleVersion`）にそろえる
 
 EC2 の外（手元の Docker Desktop など）では `/etc/remote-claude/claude.env` がないので起動できない。
 
@@ -38,11 +37,11 @@ clone を省きたいときは、Remote-SSH で接続したウィンドウから
 
 ## VS Code の拡張機能なしで使う（devcontainer CLI）
 
-Remote-SSH や Dev Containers が使えないときは、EC2 のターミナル（`scripts\remote.cmd tmux`）で devcontainer CLI を使う。同じ devcontainer.json から同じコンテナができるので、あとで VS Code から開くこともできる。
+Remote-SSH や Dev Containers が使えないときは、EC2 のターミナル（`scripts\remote.cmd tmux`）で devcontainer CLI（EC2 に入れてある）を使う。同じ devcontainer.json から同じコンテナができるので、あとで VS Code から開くこともできる。
 
 ```bash
-npx -y @devcontainers/cli up --workspace-folder /work/<リポジトリ>
-npx -y @devcontainers/cli exec --workspace-folder /work/<リポジトリ> bash -l
+devcontainer up --workspace-folder /work/<リポジトリ>
+devcontainer exec --workspace-folder /work/<リポジトリ> bash -l
 ```
 
 止めるときは `docker stop $(docker ps -q --filter label=devcontainer.local_folder=/work/<リポジトリ>)`。

@@ -110,7 +110,7 @@ export class RemoteClaudeStack extends cdk.Stack {
       + `/maven/${config.codeArtifactRepository}/`;
     const userData = ec2.UserData.forLinux();
     userData.addCommands(
-      [asset('user-data.sh'), asset('setup-claude.sh'), asset('setup-java.sh')].join('\n')
+      [asset('user-data.sh'), asset('setup-devcontainer.sh')].join('\n')
         .replaceAll('__SSH_PUBLIC_KEY__', config.sshPublicKey ?? '')
         .replaceAll('__AWS_REGION__', this.region)
         .replaceAll('__CLAUDE_MODEL__', config.claudeModel)
@@ -120,8 +120,6 @@ export class RemoteClaudeStack extends cdk.Stack {
         .replaceAll('__CODEARTIFACT_DOMAIN__', config.codeArtifactDomain)
         .replaceAll('__CODEARTIFACT_DOMAIN_OWNER__', caOwner)
         .replaceAll('__CODEARTIFACT_URL__', caUrl)
-        .replaceAll('__JAVA_VERSION__', config.javaVersion)
-        .replaceAll('__GRADLE_VERSION__', config.gradleVersion)
         // 置換文字列の $ を特殊文字として扱わせないため関数で渡す
         .replaceAll('__GRADLE_INIT_SCRIPT__', () => asset('codeartifact.init.gradle.kts').trimEnd()),
     );

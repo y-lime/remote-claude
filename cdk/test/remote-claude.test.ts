@@ -1,3 +1,5 @@
+import * as fs from 'fs';
+import * as path from 'path';
 import * as cdk from 'aws-cdk-lib/core';
 import { Match, Template } from 'aws-cdk-lib/assertions';
 import { ArtifactsStack } from '../lib/artifacts-stack';
@@ -54,16 +56,28 @@ describe('user data', () => {
   const instance = Object.values(synth('nat').findResources('AWS::EC2::Instance'))[0];
   const userData: string = instance.Properties.UserData['Fn::Base64'];
 
-  test('Claude Code を入れ、Bedrock の設定をする', () => {
-    expect(userData).toContain('https://claude.ai/install.sh');
-    expect(userData).toContain('ANTHROPIC_DEFAULT_OPUS_MODEL=global.anthropic.claude-opus-4-6-v1');
-    expect(userData).toContain('nodejs24-npm');
-    expect(userData).toContain('AWS_REGION=ap-northeast-1');
+  test('Docker と devcontainer CLI を入れる', () => {
+    expect(userData).toContain('dnf install -y docker');
+    expect(userData).toContain('"max-size": "10m"');
+    expect(userData).toContain('npm install -g @devcontainers/cli');
   });
 
-  test('Java と Gradle を入れ、CodeArtifact を使う init スクリプトを置く', () => {
-    expect(userData).toContain('java-25-amazon-corretto-devel');
-    expect(userData).toContain('GRADLE_VERSION=9.8.2');
+  test('devcontainer-template のベースイメージを先に取っておく', () => {
+    const devcontainerJson = fs.readFileSync(
+      path.join(__dirname, '..', '..', 'devcontainer-template', '.devcontainer', 'devcontainer.json'), 'utf8');
+    const image = devcontainerJson.match(/"image":\s*"([^"]+)"/)![1];
+    expect(userData).toContain(`docker pull ${image}`);
+  });
+
+  test('開発ツールはホストに入れない（devcontainer の中で使う）', () => {
+    expect(userData).not.toContain('https://claude.ai/install.sh');
+    expect(userData).not.toContain('amazon-corretto');
+    expect(userData).not.toContain('services.gradle.org');
+  });
+
+  test('devcontainer に渡す Bedrock と CodeArtifact の設定を置く', () => {
+    expect(userData).toContain('ANTHROPIC_DEFAULT_OPUS_MODEL=global.anthropic.claude-opus-4-6-v1');
+    expect(userData).toContain('AWS_REGION=ap-northeast-1');
     expect(userData).toContain(
       'CODEARTIFACT_URL=https://remote-claude-123456789012.d.codeartifact.ap-northeast-1.amazonaws.com/maven/libs/');
     expect(userData).toContain('"get-authorization-token"');

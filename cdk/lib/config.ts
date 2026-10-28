@@ -23,9 +23,6 @@ export interface RemoteClaudeConfig {
   readonly claudeHaikuModel: string;
   /** 既定で使うモデル（ANTHROPIC_MODEL）。opus / sonnet / haiku の別名か、推論プロファイルの ID */
   readonly claudeModel: string;
-  /** Amazon Corretto のメジャーバージョン（dnf の java-<N>-amazon-corretto-devel） */
-  readonly javaVersion: string;
-  readonly gradleVersion: string;
   /** true ならこのアプリで CodeArtifact のドメインとリポジトリを作る。false なら既存のものを使う */
   readonly codeArtifactCreate: boolean;
   readonly codeArtifactDomain: string;
@@ -68,8 +65,6 @@ export function loadConfig(node: Node): RemoteClaudeConfig {
     claudeSonnetModel: node.tryGetContext('claudeSonnetModel') ?? 'jp.anthropic.claude-sonnet-4-6',
     claudeHaikuModel: node.tryGetContext('claudeHaikuModel') ?? 'jp.anthropic.claude-haiku-4-5-20251001-v1:0',
     claudeModel: node.tryGetContext('claudeModel') ?? 'opus',
-    javaVersion: String(node.tryGetContext('javaVersion') ?? '25'),
-    gradleVersion: String(node.tryGetContext('gradleVersion') ?? '9.8.2'),
     // -c codeArtifactCreate=false は文字列で渡ってくる
     codeArtifactCreate: String(node.tryGetContext('codeArtifactCreate') ?? 'true') !== 'false',
     codeArtifactDomain: node.tryGetContext('codeArtifactDomain') ?? 'remote-claude',

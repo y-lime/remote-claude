@@ -138,7 +138,7 @@ try {
       exit $LASTEXITCODE
     }
     { $_ -in 'shell', 'tmux' } {
-      # 既定の ssm-user ではなく、Claude Code を入れてある ec2-user のログインシェルで開く
+      # 既定の ssm-user ではなく、docker グループに入っている ec2-user のログインシェルで開く
       $remoteCommand = 'sudo -iu ec2-user'
       if ($Command -eq 'tmux') {
         $session = if ($Rest.Count -gt 0) { $Rest[0] } else { 'main' }
