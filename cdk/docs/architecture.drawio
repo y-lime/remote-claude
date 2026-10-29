@@ -30,20 +30,26 @@
           <mxGeometry x="700" y="500" width="280" height="140" as="geometry" />
         </mxCell>
         <!-- ===== 手元 ===== -->
-        <mxCell id="local" value="手元の Windows PC" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#666666;verticalAlign=top;fontStyle=1;arcSize=4;" vertex="1" parent="1">
+        <mxCell id="admin" value="&lt;b&gt;管理者の PC&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;cd cdk; npm run deploy&lt;br&gt;（cdk deploy --all → 接続キット作成）&lt;br&gt;→ kits/remote-claude-&amp;lt;名前&amp;gt;.zip&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#666666;verticalAlign=middle;arcSize=4;" vertex="1" parent="1">
+          <mxGeometry x="20" y="150" width="230" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="local" value="メンバーの Windows PC（人数ぶん）" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#666666;verticalAlign=top;fontStyle=1;arcSize=4;" vertex="1" parent="1">
           <mxGeometry x="20" y="300" width="230" height="280" as="geometry" />
         </mxCell>
         <mxCell id="client" value="" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#232F3D;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;pointerEvents=1;shape=mxgraph.aws4.client;" vertex="1" parent="1">
-          <mxGeometry x="105" y="340" width="60" height="60" as="geometry" />
+          <mxGeometry x="105" y="330" width="60" height="60" as="geometry" />
         </mxCell>
-        <mxCell id="localText" value="・VS Code（Remote-SSH）&lt;br&gt;・ssh remote-claude&lt;br&gt;・scripts\remote.cmd&lt;br&gt;&amp;nbsp; start / stop / status / ssh / shell&lt;br&gt;・AWS CLI v2 + Session Manager Plugin" style="text;html=1;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=11;" vertex="1" parent="1">
-          <mxGeometry x="30" y="420" width="215" height="140" as="geometry" />
+        <mxCell id="localText" value="・接続キット（remote.cmd、接続先、&lt;br&gt;&amp;nbsp; 導入説明書、.devcontainer）&lt;br&gt;&amp;nbsp; start / stop / status / tmux / shell / ssh&lt;br&gt;・VS Code（Remote-SSH）&lt;br&gt;&amp;nbsp; ssh remote-claude-&amp;lt;名前&amp;gt;&lt;br&gt;・AWS CLI v2 + Session Manager Plugin&lt;br&gt;・認証は自分の IAM ユーザー" style="text;html=1;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="30" y="400" width="215" height="170" as="geometry" />
         </mxCell>
-        <mxCell id="note" value="&lt;b&gt;メモ&lt;/b&gt;&lt;br&gt;・インバウンドは全閉（SSM 経由のみ）&lt;br&gt;・context egress=nat（既定）の構成&lt;br&gt;&amp;nbsp; public：パブリック IP、エンドポイントなし&lt;br&gt;&amp;nbsp; isolated：NAT なし（閉域）&lt;br&gt;・IMDSv2 必須、ホップ数 2&lt;br&gt;&amp;nbsp; （devcontainer からロールを使う）" style="text;html=1;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=11;rounded=1;fillColor=#FFF9E5;strokeColor=#D6B656;spacing=6;" vertex="1" parent="1">
-          <mxGeometry x="20" y="620" width="230" height="150" as="geometry" />
+        <mxCell id="eAdminLocal" value="接続キット（zip）" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;dashed=1;fontSize=10;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="admin" target="local">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="note" value="&lt;b&gt;メモ&lt;/b&gt;&lt;br&gt;・インバウンドは全閉（SSM 経由のみ）&lt;br&gt;・context egress=nat（既定）の構成&lt;br&gt;&amp;nbsp; public：パブリック IP、エンドポイントなし&lt;br&gt;&amp;nbsp; isolated：NAT なし（閉域）&lt;br&gt;・IMDSv2 必須、ホップ数 2&lt;br&gt;&amp;nbsp; （devcontainer からロールを使う）&lt;br&gt;・スタック&lt;br&gt;&amp;nbsp; RemoteClaudeBaseStack：VPC、NAT、&lt;br&gt;&amp;nbsp; エンドポイント、ロール、ポリシー（共有）&lt;br&gt;&amp;nbsp; RemoteClaude-&amp;lt;名前&amp;gt;：EC2（1人1つ）" style="text;html=1;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=11;rounded=1;fillColor=#FFF9E5;strokeColor=#D6B656;spacing=6;" vertex="1" parent="1">
+          <mxGeometry x="20" y="610" width="230" height="200" as="geometry" />
         </mxCell>
         <!-- ===== インターネット ===== -->
-        <mxCell id="internet" value="Internet&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;GitHub / npm / Docker Hub / Claude Code 配布元 / services.gradle.org&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#232F3E;fontStyle=1;" vertex="1" parent="1">
+        <mxCell id="internet" value="Internet&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;GitHub / npm / mcr.microsoft.com・ghcr.io&lt;br&gt;（devcontainer のイメージ、Claude Code、Gradle）&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#232F3E;fontStyle=1;" vertex="1" parent="1">
           <mxGeometry x="600" y="20" width="300" height="80" as="geometry" />
         </mxCell>
         <!-- ===== VPC 内 ===== -->
@@ -53,8 +59,17 @@
         <mxCell id="nat" value="NAT Gateway" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#8C4FFF;strokeColor=none;dashed=0;verticalLabelPosition=middle;verticalAlign=middle;labelPosition=right;align=left;spacingLeft=4;html=1;fontSize=11;fontStyle=0;aspect=fixed;pointerEvents=1;shape=mxgraph.aws4.nat_gateway;" vertex="1" parent="1">
           <mxGeometry x="726" y="346" width="48" height="48" as="geometry" />
         </mxCell>
-        <mxCell id="ec2" value="&lt;b&gt;EC2&lt;/b&gt;（Amazon Linux 2023 / t3.large）&lt;br&gt;EBS gp3 100GB（暗号化）&lt;br&gt;Docker・git・tmux・Node.js 24&lt;br&gt;Corretto 25・Gradle 9.8.2&lt;br&gt;devcontainer + Claude Code&lt;br&gt;/work（リポジトリの clone 先）" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#ED7100;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=11;fontStyle=0;aspect=fixed;pointerEvents=1;shape=mxgraph.aws4.instance2;" vertex="1" parent="1">
-          <mxGeometry x="500" y="530" width="60" height="60" as="geometry" />
+        <mxCell id="ec2" value="メンバー A" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#ED7100;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=10;fontStyle=0;aspect=fixed;pointerEvents=1;shape=mxgraph.aws4.instance2;" vertex="1" parent="1">
+          <mxGeometry x="430" y="530" width="50" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="ec2b" value="メンバー B" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#ED7100;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=10;fontStyle=0;aspect=fixed;pointerEvents=1;shape=mxgraph.aws4.instance2;" vertex="1" parent="1">
+          <mxGeometry x="505" y="530" width="50" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="ec2more" value="…" style="text;html=1;align=center;verticalAlign=middle;fontSize=16;fontColor=#232F3E;" vertex="1" parent="1">
+          <mxGeometry x="565" y="535" width="30" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="ec2Text" value="&lt;b&gt;EC2 × メンバー数&lt;/b&gt;（RemoteClaude-&amp;lt;名前&amp;gt;）&lt;br&gt;AL2023 / t3.large、EBS gp3 100GB（暗号化）&lt;br&gt;ホスト：Docker・devcontainer CLI・git・tmux など&lt;br&gt;devcontainer：Java 25・Gradle・Claude Code&lt;br&gt;/work（リポジトリの clone 先）&lt;br&gt;使っていなければ 30 分で自動停止" style="text;html=1;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=10;fontColor=#232F3E;" vertex="1" parent="1">
+          <mxGeometry x="398" y="605" width="268" height="100" as="geometry" />
         </mxCell>
         <mxCell id="epSsm" value="ssm" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#8C4FFF;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=10;fontStyle=0;aspect=fixed;pointerEvents=1;shape=mxgraph.aws4.endpoints;" vertex="1" parent="1">
           <mxGeometry x="718" y="535" width="40" height="40" as="geometry" />
@@ -81,11 +96,14 @@
         <mxCell id="s3" value="Amazon S3&lt;br&gt;（AL2023 の dnf リポジトリ）" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#7AA116;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=11;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.s3;" vertex="1" parent="1">
           <mxGeometry x="1150" y="520" width="60" height="60" as="geometry" />
         </mxCell>
+        <mxCell id="userPolicy" value="IAM ポリシー&lt;br&gt;RemoteClaudeUser&lt;br&gt;メンバーの IAM ユーザーに付与&lt;br&gt;managed タグの EC2 を&lt;br&gt;起動・停止・SSM 接続" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#DD344C;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=10;fontStyle=0;aspect=fixed;pointerEvents=1;shape=mxgraph.aws4.permissions;" vertex="1" parent="1">
+          <mxGeometry x="1300" y="680" width="40" height="48" as="geometry" />
+        </mxCell>
         <mxCell id="ssm" value="Systems Manager&lt;br&gt;（Session Manager）" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#E7157B;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=11;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.systems_manager;" vertex="1" parent="1">
           <mxGeometry x="1150" y="680" width="60" height="60" as="geometry" />
         </mxCell>
         <!-- ===== 接続線 ===== -->
-        <mxCell id="eLocalSsm" value="SSH over SSM（HTTPS 443）／ ec2 start-instances&lt;br&gt;remote.cmd：止まっていれば起動してから接続" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeColor=#E7157B;strokeWidth=2;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="local" target="ssm">
+        <mxCell id="eLocalSsm" value="SSH over SSM（HTTPS 443）／ ec2 start-instances（RemoteClaudeUser の権限）&lt;br&gt;remote.cmd：止まっていれば起動してから接続" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeColor=#E7157B;strokeWidth=2;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="local" target="ssm">
           <mxGeometry relative="1" as="geometry">
             <Array as="points">
               <mxPoint x="135" y="880" />
@@ -93,7 +111,7 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="eEc2Endpoints" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;entryX=0;entryY=0.43;entryDx=0;entryDy=0;" edge="1" parent="1" source="ec2" target="endpointGroup">
+        <mxCell id="eEc2Endpoints" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;entryX=0;entryY=0.43;entryDx=0;entryDy=0;" edge="1" parent="1" source="ec2more" target="endpointGroup">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
         <mxCell id="eEndpointsBedrock" value="Claude の呼び出し" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;exitX=1;exitY=0.25;exitDx=0;exitDy=0;fontSize=10;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="endpointGroup" target="bedrock">

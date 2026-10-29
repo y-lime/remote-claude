@@ -11,7 +11,7 @@ Claude Code を常駐させるリモート環境（メンバーごとに AWS EC2
 
 ## 構成
 
-構成図：[docs/architecture.drawio](docs/architecture.drawio)（`egress=nat` の場合。draw.io か VS Code の Draw.io Integration 拡張で開く）
+構成図：[docs/architecture.drawio](docs/architecture.drawio)（`egress=nat` でメンバーが複数いる場合。draw.io か VS Code の Draw.io Integration 拡張で開く）
 
 - EC2（Amazon Linux 2023、t3.large、EBS gp3 100GB 暗号化）。開発は devcontainer（[devcontainer-template/](../devcontainer-template/README.md)）の中で行う前提で、ホストには Docker、docker compose、devcontainer CLI と、git、git-lfs、tmux、jq、rsync、zip / unzip、tree、htop、lsof、vim、emacs（nox）などのコマンドだけを初回起動時に入れる（`assets/user-data.sh`）。Claude Code、Java、Gradle はホストには入れない
 - コンテナのログは 10MB × 3 ファイルでローテーションする（`/etc/docker/daemon.json`）
