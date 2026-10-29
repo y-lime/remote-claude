@@ -1,21 +1,30 @@
-import * as fs from 'fs';
-import * as path from 'path';
 import * as cdk from 'aws-cdk-lib/core';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import { Construct } from 'constructs';
 import { RemoteClaudeConfig } from './config';
 
-export interface RemoteClaudeStackProps extends cdk.StackProps {
+/** メンバーが接続、起動、停止してよいインスタンスに付けるタグ */
+export const MANAGED_TAG_KEY = 'remote-claude:managed';
+export const MANAGED_TAG_VALUE = 'true';
+
+export interface RemoteClaudeBaseStackProps extends cdk.StackProps {
   readonly config: RemoteClaudeConfig;
 }
 
 /**
- * Claude Code を常駐させる EC2 1台と、そのネットワーク。
+ * メンバー全員の EC2 で共有するもの（ネットワーク、インスタンスロール、起動テンプレート、メンバー用ポリシー）。
+ * NAT と VPC エンドポイントを人数ぶん払わないよう、EC2 とは別のスタックにして1つだけ作る。
  * 接続は SSM Session Manager（SSH over SSM）だけで、インバウンドは全閉。
  */
-export class RemoteClaudeStack extends cdk.Stack {
-  constructor(scope: Construct, id: string, props: RemoteClaudeStackProps) {
+export class RemoteClaudeBaseStack extends cdk.Stack {
+  readonly vpc: ec2.IVpc;
+  readonly instanceSubnetType: ec2.SubnetType;
+  readonly securityGroup: ec2.ISecurityGroup;
+  readonly role: iam.IRole;
+  readonly launchTemplate: ec2.LaunchTemplate;
+
+  constructor(scope: Construct, id: string, props: RemoteClaudeBaseStackProps) {
     super(scope, id, props);
     const { config } = props;
 
@@ -25,6 +34,7 @@ export class RemoteClaudeStack extends cdk.Stack {
       public: ec2.SubnetType.PUBLIC,
       isolated: ec2.SubnetType.PRIVATE_ISOLATED,
     }[config.egress];
+    this.instanceSubnetType = instanceSubnetType;
 
     const subnetConfiguration: ec2.SubnetConfiguration[] = [];
     if (config.egress !== 'isolated') {
@@ -34,7 +44,7 @@ export class RemoteClaudeStack extends cdk.Stack {
       subnetConfiguration.push({ name: 'private', subnetType: instanceSubnetType, cidrMask: 24 });
     }
 
-    // 1台だけなので AZ も1つ（NAT とエンドポイントの料金を AZ 数ぶん払わないため）
+    // AZ は1つ（NAT とエンドポイントの料金を AZ 数ぶん払わないため）
     const vpc = new ec2.Vpc(this, 'Vpc', {
       ipAddresses: ec2.IpAddresses.cidr('10.80.0.0/16'),
       maxAzs: 1,
@@ -45,6 +55,7 @@ export class RemoteClaudeStack extends cdk.Stack {
         S3: { service: ec2.GatewayVpcEndpointAwsService.S3 },
       },
     });
+    this.vpc = vpc;
 
     if (config.egress !== 'public') {
       const endpoints: Record<string, ec2.InterfaceVpcEndpointAwsService> = {
@@ -58,17 +69,18 @@ export class RemoteClaudeStack extends cdk.Stack {
       }
     }
 
-    const securityGroup = new ec2.SecurityGroup(this, 'InstanceSg', {
+    this.securityGroup = new ec2.SecurityGroup(this, 'InstanceSg', {
       vpc,
       description: 'remote-claude instance (no inbound)',
       allowAllOutbound: true,
     });
 
-    // ---- IAM ----
+    // ---- インスタンスロール ----
     const role = new iam.Role(this, 'InstanceRole', {
       assumedBy: new iam.ServicePrincipal('ec2.amazonaws.com'),
       managedPolicies: [iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonSSMManagedInstanceCore')],
     });
+    this.role = role;
     // クロスリージョン推論プロファイルは他リージョンのモデルを呼ぶので、リージョンは * にする
     role.addToPolicy(new iam.PolicyStatement({
       sid: 'InvokeClaudeOnBedrock',
@@ -104,69 +116,55 @@ export class RemoteClaudeStack extends cdk.Stack {
       conditions: { StringEquals: { 'sts:AWSServiceName': 'codeartifact.amazonaws.com' } },
     }));
 
-    // ---- EC2 ----
-    const asset = (name: string) => fs.readFileSync(path.join(__dirname, '..', 'assets', name), 'utf8');
-    const caUrl = `https://${config.codeArtifactDomain}-${caOwner}.d.codeartifact.${this.region}.amazonaws.com`
-      + `/maven/${config.codeArtifactRepository}/`;
-    const userData = ec2.UserData.forLinux();
-    userData.addCommands(
-      [asset('user-data.sh'), asset('setup-devcontainer.sh'), asset('setup-idle-stop.sh')].join('\n')
-        .replaceAll('__SSH_PUBLIC_KEY__', config.sshPublicKey ?? '')
-        .replaceAll('__AWS_REGION__', this.region)
-        .replaceAll('__CLAUDE_MODEL__', config.claudeModel)
-        .replaceAll('__CLAUDE_OPUS_MODEL__', config.claudeOpusModel)
-        .replaceAll('__CLAUDE_SONNET_MODEL__', config.claudeSonnetModel)
-        .replaceAll('__CLAUDE_HAIKU_MODEL__', config.claudeHaikuModel)
-        .replaceAll('__CODEARTIFACT_DOMAIN__', config.codeArtifactDomain)
-        .replaceAll('__CODEARTIFACT_DOMAIN_OWNER__', caOwner)
-        .replaceAll('__CODEARTIFACT_URL__', caUrl)
-        .replaceAll('__IDLE_STOP_MINUTES__', String(config.idleStopMinutes))
-        // 置換文字列の $ を特殊文字として扱わせないため関数で渡す
-        .replaceAll('__GRADLE_INIT_SCRIPT__', () => asset('codeartifact.init.gradle.kts').trimEnd()),
-    );
-    if (!config.sshPublicKey) {
-      cdk.Annotations.of(this).addWarningV2('remote-claude:no-ssh-key',
-        'sshPublicKeyPath の公開鍵が見つからないため、authorized_keys に登録しません（SSH over SSM で接続できません）');
-    }
-
-    const instance = new ec2.Instance(this, 'Instance', {
-      vpc,
-      vpcSubnets: { subnetType: instanceSubnetType },
-      securityGroup,
-      role,
-      instanceType: new ec2.InstanceType(config.instanceType),
-      machineImage: ec2.MachineImage.latestAmazonLinux2023(),
-      userData,
-      // user data は初回起動時にしか実行されないので、変えたらインスタンスごと作り直す（EBS も消える）
-      userDataCausesReplacement: true,
-      // 使っていないときに中から止める（assets/setup-idle-stop.sh）ので、シャットダウンは終了ではなく停止にする
-      instanceInitiatedShutdownBehavior: ec2.InstanceInitiatedShutdownBehavior.STOP,
-      blockDevices: [{
-        deviceName: '/dev/xvda',
-        volume: ec2.BlockDeviceVolume.ebs(config.volumeSizeGiB, {
-          volumeType: ec2.EbsDeviceVolumeType.GP3,
-          encrypted: true,
-        }),
-      }],
-    });
-    cdk.Tags.of(instance).add('Name', 'remote-claude');
-
     // IMDSv2 を必須にしつつ、ホップ数を 2 にして devcontainer（ブリッジネットワーク）からもロールの認証情報を取れるようにする
-    const metadataTemplate = new ec2.LaunchTemplate(this, 'MetadataOptions', {
+    this.launchTemplate = new ec2.LaunchTemplate(this, 'MetadataOptions', {
       requireImdsv2: true,
       httpPutResponseHopLimit: 2,
     });
-    const cfnInstance = instance.node.defaultChild as ec2.CfnInstance;
-    cfnInstance.launchTemplate = {
-      launchTemplateId: metadataTemplate.launchTemplateId,
-      version: metadataTemplate.latestVersionNumber,
-    };
 
-    // ---- 出力 ----
-    new cdk.CfnOutput(this, 'InstanceId', { value: instance.instanceId });
-    new cdk.CfnOutput(this, 'Egress', { value: config.egress });
-    new cdk.CfnOutput(this, 'SsmStartSession', {
-      value: `aws ssm start-session --region ${this.region} --target ${instance.instanceId}`,
+    // ---- メンバー用ポリシー ----
+    // チーム内で使うので、どのメンバーの EC2 にも入れてよい（タグの付いたインスタンスに限る）
+    const managedTag = { [`aws:ResourceTag/${MANAGED_TAG_KEY}`]: MANAGED_TAG_VALUE };
+    const userPolicy = new iam.ManagedPolicy(this, 'UserPolicy', {
+      managedPolicyName: 'RemoteClaudeUser',
+      description: 'remote-claude の EC2 を起動、停止し、SSM で接続する（scripts/remote.ps1）',
+      statements: [
+        new iam.PolicyStatement({
+          sid: 'Describe',
+          actions: ['ec2:DescribeInstances', 'ssm:DescribeInstanceInformation'],
+          resources: ['*'],
+        }),
+        new iam.PolicyStatement({
+          sid: 'StartStopInstances',
+          actions: ['ec2:StartInstances', 'ec2:StopInstances'],
+          resources: [`arn:aws:ec2:${this.region}:${this.account}:instance/*`],
+          conditions: { StringEquals: managedTag },
+        }),
+        new iam.PolicyStatement({
+          sid: 'StartSessionOnInstances',
+          actions: ['ssm:StartSession'],
+          resources: [`arn:aws:ec2:${this.region}:${this.account}:instance/*`],
+          conditions: { StringEquals: managedTag },
+        }),
+        new iam.PolicyStatement({
+          sid: 'StartSessionDocuments',
+          actions: ['ssm:StartSession'],
+          resources: ['AWS-StartSSHSession', 'AWS-StartInteractiveCommand']
+            .map((doc) => `arn:aws:ssm:${this.region}::document/${doc}`),
+        }),
+        new iam.PolicyStatement({
+          sid: 'OwnSessions',
+          actions: ['ssm:TerminateSession', 'ssm:ResumeSession'],
+          resources: [`arn:aws:ssm:${this.region}:${this.account}:session/\${aws:username}-*`],
+        }),
+      ],
     });
+    const iamUsers = [...new Set(config.instances.flatMap((i) => (i.iamUser ? [i.iamUser] : [])))];
+    for (const userName of iamUsers) {
+      userPolicy.attachToUser(iam.User.fromUserName(this, `Member-${userName}`, userName));
+    }
+
+    new cdk.CfnOutput(this, 'Egress', { value: config.egress });
+    new cdk.CfnOutput(this, 'UserPolicyName', { value: userPolicy.managedPolicyName });
   }
 }

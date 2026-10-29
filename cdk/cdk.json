@@ -21,7 +21,9 @@
     "egress": "nat",
     "instanceType": "t3.large",
     "volumeSizeGiB": 100,
-    "sshPublicKeyPath": "~/.ssh/id_ed25519.pub",
+    "instances": {
+      "ymura": { "sshPublicKeyPath": "~/.ssh/id_ed25519.pub" }
+    },
     "claudeModel": "opus",
     "claudeOpusModel": "global.anthropic.claude-opus-4-6-v1",
     "claudeSonnetModel": "jp.anthropic.claude-sonnet-4-6",

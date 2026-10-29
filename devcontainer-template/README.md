@@ -18,17 +18,17 @@ EC2 の外（手元の Docker Desktop など）では `/etc/remote-claude/claude
 
    ```json
    "remote.SSH.connectTimeout": 300,
-   "remote.SSH.remotePlatform": { "remote-claude": "linux" }
+   "remote.SSH.remotePlatform": { "remote-claude-<名前>": "linux" }
    ```
 
 ## 使い方
 
-1. VS Code で **Remote-SSH: Connect to Host...** → `remote-claude` を選ぶ。止まっていれば自動で起動する
+1. VS Code で **Remote-SSH: Connect to Host...** → `remote-claude-<名前>` を選ぶ。止まっていれば自動で起動する
 2. リモートのターミナルで、リポジトリを `/work` に clone する
 3. ひな形をリポジトリにコピーする（手元の PowerShell で実行）
 
    ```powershell
-   scp -r devcontainer-template\.devcontainer remote-claude:/work/<リポジトリ>/
+   scp -r devcontainer-template\.devcontainer remote-claude-<名前>:/work/<リポジトリ>/
    ```
 
 4. VS Code で `/work/<リポジトリ>` を開き、**Dev Containers: Reopen in Container** を実行する。初回はイメージの取得とビルドに数分かかる

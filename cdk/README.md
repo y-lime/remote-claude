@@ -1,6 +1,12 @@
 # remote-claude
 
-Claude Code を常駐させるリモート環境（AWS EC2 1台）を作る CDK（TypeScript）。
+Claude Code を常駐させるリモート環境（メンバーごとに AWS EC2 1台）を作る CDK（TypeScript）。
+
+| スタック | 中身 |
+|---|---|
+| `RemoteClaudeBaseStack` | 全員で共有するもの：VPC、NAT、VPC エンドポイント、SG、インスタンスロール、IMDSv2 の起動テンプレート、メンバー用ポリシー `RemoteClaudeUser` |
+| `RemoteClaude-<名前>` | メンバー1人ぶんの EC2。context の `instances` の項目ごとに1つ |
+| `RemoteClaudeArtifactsStack` | CodeArtifact |
 `cdk/` ディレクトリで作業する。設計と経緯は Obsidian の `notebook/general/remote-claude/` にある。
 
 ## 構成
@@ -84,7 +90,7 @@ publishing {
 | EBS 100GB | 約 $10 |
 | CodeArtifact | 保存 $0.05/GB・月 + リクエスト 1万件あたり $0.05（ほぼかからない） |
 
-Bedrock の利用料は含まない。EC2 を止めていても、NAT、エンドポイント、EBS の約 $95 はかかる。
+Bedrock の利用料は含まない。EC2 と EBS は1人あたりの金額。NAT とエンドポイントは全員で1つなので、人数が増えても変わらない。EC2 を止めていても、NAT とエンドポイントの約 $86 と、1人あたり EBS の約 $10 はかかる。
 
 ## 設定（`cdk.json` の context、`-c key=value` でも上書きできる）
 
@@ -92,9 +98,9 @@ Bedrock の利用料は含まない。EC2 を止めていても、NAT、エン�
 |---|---|
 | `region` | `ap-northeast-1` |
 | `egress` | `nat` |
-| `instanceType` | `t3.large` |
-| `volumeSizeGiB` | `100` |
-| `sshPublicKeyPath` | `~/.ssh/id_ed25519.pub`（ec2-user の authorized_keys に登録する） |
+| `instances` | メンバーごとの EC2（下記） |
+| `instanceType` | `t3.large`（全員の既定値） |
+| `volumeSizeGiB` | `100`（全員の既定値） |
 | `claudeModel` | `opus`（Claude Code が既定で使うモデル。別名か推論プロファイルの ID） |
 | `claudeOpusModel` | `global.anthropic.claude-opus-4-6-v1`（jp. がないので global.） |
 | `claudeSonnetModel` | `jp.anthropic.claude-sonnet-4-6` |
@@ -104,6 +110,15 @@ Bedrock の利用料は含まない。EC2 を止めていても、NAT、エン�
 | `codeArtifactDomain` | `remote-claude` |
 | `codeArtifactDomainOwner` | なし（スタックのアカウント） |
 | `codeArtifactRepository` | `libs`（Gradle が見るリポジトリ） |
+
+`instances` は名前（英小文字、数字、`-`）から個別設定へのマップ。個別設定はどれも省略できる。
+
+| キー | 意味 |
+|---|---|
+| `iamUser` | 接続を許可する既存の IAM ユーザー。ポリシー `RemoteClaudeUser` を付ける |
+| `sshPublicKey` | ec2-user の authorized_keys に登録する公開鍵（文字列） |
+| `sshPublicKeyPath` | 同じく、ファイルで渡す（自分の鍵向け。例 `~/.ssh/id_ed25519.pub`） |
+| `instanceType` / `volumeSizeGiB` | 全員の既定値を上書きする |
 
 Java と Gradle のバージョンは `devcontainer-template/.devcontainer/devcontainer.json` の java の feature で決める（ホストには入れない）。
 
@@ -124,20 +139,26 @@ cd cdk
 npm ci
 npx cdk bootstrap   # アカウントとリージョンごとに初回だけ
 npx cdk diff --all
-npx cdk deploy --all
+npm run deploy      # cdk deploy --all のあと、接続キットを ../kits/ に作る（scripts/make-kits.ts）
 ```
 
-出力の `InstanceId` を控える。初回起動時のセットアップには数分かかる。終わったかどうかは `sudo cat /var/log/cloud-init-output.log` で確認する。
+初回起動時のセットアップには数分かかる。終わったかどうかは `sudo cat /var/log/cloud-init-output.log` で確認する。
+
+接続キット（`kits/remote-claude-<名前>.zip`）は、デプロイ済みの `RemoteClaude-*` スタックの出力から毎回全員分を作り直す。中身は `scripts/remote.cmd`・`remote.ps1`、接続先を書いた `remote-claude.config.ps1`、導入説明書（`assets/kit-README.md` から作る）、`devcontainer-template/.devcontainer/`。
+
+### 1台だけだった頃（`RemoteClaudeStack`）からの移行
+
+`RemoteClaudeStack` の EC2 はそのまま引き継げず、新しく作ることになる（EBS の中身は移らない）。作業を退避し、`npm run deploy` で新しいスタックを作って確かめてから、`npx cdk destroy RemoteClaudeStack` で古いスタックを消す。
 
 ## 接続
 
-起動、停止、接続はリポジトリ直下の `scripts\remote.cmd` で行う（[README](../README.md) を参照）。
+起動、停止、接続はリポジトリ直下の `scripts\remote.cmd` で行う（[README](../README.md) を参照）。メンバーは接続キットの `remote.cmd` を使う。
 
-VS Code では Remote-SSH で `remote-claude` に接続する。
+VS Code では Remote-SSH で `remote-claude-<名前>` に接続する。
 
 ## 注意
 
 - `cdk destroy` を実行すると、EBS（`/work` の中身も含む）が一緒に削除される
-- user data（`assets/` のファイル、公開鍵、モデル指定、CodeArtifact の指定）を変えると、インスタンスは作り直しになる。EBS が消え、インスタンス ID も変わる（`scripts\remote.cmd ssh-config` で設定を出し直す）。必ず `cdk diff` で確認してからデプロイする
+- user data（`assets/` のファイル、公開鍵、モデル指定、CodeArtifact の指定）を変えると、インスタンスは作り直しになる。全員共通の設定を変えると全員分が作り直しになる。EBS が消え、インスタンス ID も変わる（`npm run deploy` で作り直したキットを渡し直し、`ssh-config` も出し直してもらう）。必ず `cdk diff` で確認してからデプロイする
 - 今あるインスタンスに設定だけ反映したいときは、`assets/setup-devcontainer.sh` のプレースホルダーを置き換えて、SSM Run Command で流す（何度実行してもよい）。devcontainer は作り直す（Rebuild Container）と新しい設定を読む
 - 開発コマンド：`npm test`（テンプレートのテスト）、`npx cdk synth`

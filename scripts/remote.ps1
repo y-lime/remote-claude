@@ -4,25 +4,32 @@
   remote.ps1 start              起動して、SSM で接続できるようになるまで待つ
   remote.ps1 stop               停止する
   remote.ps1 status             状態を表示する
-  remote.ps1 ssh [ssh の引数]   止まっていたら起動してから ssh で接続する（~/.ssh/config の Host remote-claude を使う）
+  remote.ps1 ssh [ssh の引数]   止まっていたら起動してから ssh で接続する（~/.ssh/config の Host remote-claude-<名前> を使う）
   remote.ps1 shell              止まっていたら起動してから SSM で ec2-user のシェルを開く（SSH 鍵は不要）
   remote.ps1 tmux [名前]        shell と同じだが、tmux のセッションに入る（既定 main。なければ作る。切断しても作業が続く）
   remote.ps1 ssh-config         ~/.ssh/config に追記する設定を表示する
   remote.ps1 proxy <id> <port>  ssh の ProxyCommand 用。止まっていたら起動してから SSH over SSM をつなぐ
 
-環境変数（任意）:
+環境変数（任意。同じフォルダに remote-claude.config.ps1 があれば、そちらの設定が優先）:
+  REMOTE_CLAUDE_NAME         接続先のメンバー名。既定はログインユーザー名（小文字）
   REMOTE_CLAUDE_REGION       既定 ap-northeast-1
-  REMOTE_CLAUDE_STACK        既定 RemoteClaudeStack
+  REMOTE_CLAUDE_STACK        既定 RemoteClaude-<名前>
   REMOTE_CLAUDE_INSTANCE_ID  指定するとスタックの出力を読まない
   AWS_PROFILE                AWS CLI のプロファイル
 #>
 
 $ErrorActionPreference = 'Stop'
 
+$Name = if ($env:REMOTE_CLAUDE_NAME) { $env:REMOTE_CLAUDE_NAME } else { $env:USERNAME.ToLower() }
 $Region = if ($env:REMOTE_CLAUDE_REGION) { $env:REMOTE_CLAUDE_REGION } else { 'ap-northeast-1' }
-$StackName = if ($env:REMOTE_CLAUDE_STACK) { $env:REMOTE_CLAUDE_STACK } else { 'RemoteClaudeStack' }
-$HostAlias = 'remote-claude'
+$StackName = if ($env:REMOTE_CLAUDE_STACK) { $env:REMOTE_CLAUDE_STACK } else { "RemoteClaude-$Name" }
+$InstanceId = $env:REMOTE_CLAUDE_INSTANCE_ID
+$HostAlias = "remote-claude-$Name"
 $SsmTimeoutSec = 300
+
+# メンバーに渡すキット（cdk/scripts/make-kits.ts）では、ここで接続先（$Region、$InstanceId、$HostAlias）が決まる
+$ConfigPath = Join-Path $PSScriptRoot 'remote-claude.config.ps1'
+if (Test-Path $ConfigPath) { . $ConfigPath }
 
 # proxy では標準出力が SSH の通信路になるので、メッセージは必ず標準エラーに出す（Write-Host は使わない）
 function Log([string]$Message) {
@@ -36,7 +43,7 @@ function Invoke-Aws {
 }
 
 function Get-InstanceId {
-  if ($env:REMOTE_CLAUDE_INSTANCE_ID) { return $env:REMOTE_CLAUDE_INSTANCE_ID }
+  if ($InstanceId) { return $InstanceId }
   $id = Invoke-Aws cloudformation describe-stacks --stack-name $StackName `
     --query "Stacks[0].Outputs[?OutputKey=='InstanceId'].OutputValue"
   if (-not $id -or $id -eq 'None') { throw "スタック $StackName の出力に InstanceId がありません" }
@@ -163,7 +170,7 @@ try {
       exit $LASTEXITCODE
     }
     default {
-      (Get-Content $PSCommandPath -TotalCount 17 -Encoding UTF8 | Select-Object -Skip 1) -join "`n"
+      (Get-Content $PSCommandPath -TotalCount 18 -Encoding UTF8 | Select-Object -Skip 1) -join "`n"
       if ($Command -ne 'help') { exit 1 }
     }
   }

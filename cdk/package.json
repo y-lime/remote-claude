@@ -5,7 +5,9 @@
     "build": "tsc",
     "watch": "tsc -w",
     "test": "jest",
-    "cdk": "cdk"
+    "cdk": "cdk",
+    "deploy": "cdk deploy --all && tsx scripts/make-kits.ts",
+    "kits": "tsx scripts/make-kits.ts"
   },
   "devDependencies": {
     "@swc/core": "^1.15.0",

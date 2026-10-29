@@ -3,43 +3,51 @@ import * as path from 'path';
 import * as cdk from 'aws-cdk-lib/core';
 import { Match, Template } from 'aws-cdk-lib/assertions';
 import { ArtifactsStack } from '../lib/artifacts-stack';
+import { RemoteClaudeBaseStack } from '../lib/base-stack';
 import { Egress, loadConfig, RemoteClaudeConfig } from '../lib/config';
-import { RemoteClaudeStack } from '../lib/remote-claude-stack';
+import { RemoteClaudeInstanceStack } from '../lib/instance-stack';
 
 const env = { account: '123456789012', region: 'ap-northeast-1' };
 
-function synth(egress: Egress): Template {
-  const app = new cdk.App();
-  const config: RemoteClaudeConfig = {
-    ...loadConfig(app.node),
-    egress, sshPublicKey: 'ssh-ed25519 AAAA test',
-  };
-  return Template.fromStack(new RemoteClaudeStack(app, 'TestStack', { env, config }));
+const INSTANCES = {
+  alice: { iamUser: 'alice', sshPublicKey: 'ssh-ed25519 AAAA alice' },
+  bob: { iamUser: 'bob', instanceType: 't3.xlarge' },
+};
+
+function synthAll(egress: Egress): { base: Template; instances: Template[] } {
+  const app = new cdk.App({ context: { instances: INSTANCES } });
+  const config: RemoteClaudeConfig = { ...loadConfig(app.node), egress };
+  const base = new RemoteClaudeBaseStack(app, 'Base', { env, config });
+  const instances = config.instances.map((instance) =>
+    new RemoteClaudeInstanceStack(app, `RemoteClaude-${instance.name}`, { env, config, instance, base }));
+  return { base: Template.fromStack(base), instances: instances.map((s) => Template.fromStack(s)) };
 }
 
 describe.each<Egress>(['nat', 'public', 'isolated'])('egress=%s', (egress) => {
-  const template = synth(egress);
+  const { base, instances: [template] } = synthAll(egress);
 
   test('インスタンスの SG にインバウンドがない', () => {
-    template.hasResourceProperties('AWS::EC2::SecurityGroup', {
+    base.hasResourceProperties('AWS::EC2::SecurityGroup', {
       GroupDescription: 'remote-claude instance (no inbound)',
       SecurityGroupIngress: Match.absent(),
     });
+    base.resourceCountIs('AWS::EC2::SecurityGroupIngress', 0);
     template.resourceCountIs('AWS::EC2::SecurityGroupIngress', 0);
   });
 
   test('IMDSv2 必須、ホップ数 2', () => {
-    template.hasResourceProperties('AWS::EC2::LaunchTemplate', {
+    base.hasResourceProperties('AWS::EC2::LaunchTemplate', {
       LaunchTemplateData: {
         MetadataOptions: { HttpTokens: 'required', HttpPutResponseHopLimit: 2 },
       },
     });
+    template.hasResourceProperties('AWS::EC2::Instance', { LaunchTemplate: Match.objectLike({}) });
   });
 
   test('NAT とエンドポイントの数', () => {
-    template.resourceCountIs('AWS::EC2::NatGateway', egress === 'nat' ? 1 : 0);
+    base.resourceCountIs('AWS::EC2::NatGateway', egress === 'nat' ? 1 : 0);
     // インターフェース4本 + S3 ゲートウェイ1本
-    template.resourceCountIs('AWS::EC2::VPCEndpoint', egress === 'public' ? 1 : 5);
+    base.resourceCountIs('AWS::EC2::VPCEndpoint', egress === 'public' ? 1 : 5);
   });
 
   test('ルート EBS は暗号化された gp3', () => {
@@ -52,8 +60,65 @@ describe.each<Egress>(['nat', 'public', 'isolated'])('egress=%s', (egress) => {
   });
 });
 
+describe('メンバーごとの EC2', () => {
+  const { base, instances } = synthAll('nat');
+
+  test('ネットワークは共有し、EC2 だけ人数ぶん作る', () => {
+    base.resourceCountIs('AWS::EC2::VPC', 1);
+    base.resourceCountIs('AWS::EC2::Instance', 0);
+    expect(instances).toHaveLength(2);
+    for (const t of instances) {
+      t.resourceCountIs('AWS::EC2::Instance', 1);
+      t.resourceCountIs('AWS::EC2::VPC', 0);
+      t.resourceCountIs('AWS::EC2::NatGateway', 0);
+    }
+  });
+
+  test('名前とメンバー用ポリシーのタグを付ける', () => {
+    instances[0].hasResourceProperties('AWS::EC2::Instance', {
+      Tags: Match.arrayWith([
+        { Key: 'Name', Value: 'remote-claude-alice' },
+        { Key: 'remote-claude:managed', Value: 'true' },
+      ]),
+    });
+    instances[0].hasOutput('MemberName', { Value: 'alice' });
+  });
+
+  test('個別の instanceType で上書きできる', () => {
+    instances[0].hasResourceProperties('AWS::EC2::Instance', { InstanceType: 't3.large' });
+    instances[1].hasResourceProperties('AWS::EC2::Instance', { InstanceType: 't3.xlarge' });
+  });
+
+  test('公開鍵はそのメンバーの EC2 にだけ入る', () => {
+    const userData = (t: Template) =>
+      JSON.stringify(Object.values(t.findResources('AWS::EC2::Instance'))[0].Properties.UserData);
+    expect(userData(instances[0])).toContain('ssh-ed25519 AAAA alice');
+    expect(userData(instances[1])).not.toContain('ssh-ed25519');
+  });
+
+  test('RemoteClaudeUser を iamUser に付け、タグの付いたインスタンスにだけ接続させる', () => {
+    base.hasResourceProperties('AWS::IAM::ManagedPolicy', {
+      ManagedPolicyName: 'RemoteClaudeUser',
+      Users: ['alice', 'bob'],
+      PolicyDocument: {
+        Statement: Match.arrayWith([
+          Match.objectLike({
+            Sid: 'StartStopInstances',
+            Condition: { StringEquals: { 'aws:ResourceTag/remote-claude:managed': 'true' } },
+          }),
+          Match.objectLike({
+            Sid: 'StartSessionOnInstances',
+            Action: 'ssm:StartSession',
+            Condition: { StringEquals: { 'aws:ResourceTag/remote-claude:managed': 'true' } },
+          }),
+        ]),
+      },
+    });
+  });
+});
+
 describe('user data', () => {
-  const instance = Object.values(synth('nat').findResources('AWS::EC2::Instance'))[0];
+  const instance = Object.values(synthAll('nat').instances[0].findResources('AWS::EC2::Instance'))[0];
   const userData: string = instance.Properties.UserData['Fn::Base64'];
 
   test('Docker と devcontainer CLI を入れる', () => {
@@ -103,7 +168,7 @@ describe('user data', () => {
 });
 
 test('IAM ロールは CodeArtifact を読むだけ', () => {
-  const template = synth('nat');
+  const template = synthAll('nat').base;
   template.hasResourceProperties('AWS::IAM::Policy', {
     PolicyDocument: {
       Statement: Match.arrayWith([
@@ -164,4 +229,13 @@ test('-c codeArtifactCreate=false を読める', () => {
   const app = new cdk.App({ context: { codeArtifactCreate: 'false' } });
   expect(loadConfig(app.node).codeArtifactCreate).toBe(false);
   expect(loadConfig(new cdk.App().node).codeArtifactCreate).toBe(true);
+});
+
+test('instances の名前は英小文字、数字、- だけ', () => {
+  expect(() => loadConfig(new cdk.App({ context: { instances: { Alice: {} } } }).node)).toThrow();
+  expect(() => loadConfig(new cdk.App({ context: { instances: { 'a.b': {} } } }).node)).toThrow();
+  const config = loadConfig(new cdk.App({ context: { instances: { 'team-a1': {} } } }).node);
+  expect(config.instances).toEqual([
+    { name: 'team-a1', iamUser: undefined, sshPublicKey: undefined, instanceType: 't3.large', volumeSizeGiB: 100 },
+  ]);
 });
