@@ -83,6 +83,20 @@ describe('user data', () => {
     expect(userData).toContain('"get-authorization-token"');
   });
 
+  test('使っていなければ停止する', () => {
+    expect(userData).toContain('IDLE_STOP_MINUTES=30');
+    expect(userData).toContain('systemctl enable --now remote-claude-idle-stop.timer');
+    expect(userData).toContain('/etc/remote-claude/claude-code/managed-settings.json');
+    expect(instance.Properties.InstanceInitiatedShutdownBehavior).toBe('stop');
+  });
+
+  test('devcontainer-template が hook と書き込み先をマウントする', () => {
+    const devcontainerJson = fs.readFileSync(
+      path.join(__dirname, '..', '..', 'devcontainer-template', '.devcontainer', 'devcontainer.json'), 'utf8');
+    expect(devcontainerJson).toContain('source=/etc/remote-claude/claude-code,target=/etc/claude-code');
+    expect(devcontainerJson).toContain('source=/run/remote-claude/claude-activity,target=/run/remote-claude/claude-activity');
+  });
+
   test('プレースホルダーが残っていない', () => {
     expect(userData).not.toMatch(/__[A-Z_]+__/);
   });
@@ -138,6 +152,12 @@ describe('CodeArtifact', () => {
       }
     }
   });
+});
+
+test('idleStopMinutes は 0 以上の整数', () => {
+  expect(loadConfig(new cdk.App({ context: { idleStopMinutes: '0' } }).node).idleStopMinutes).toBe(0);
+  expect(() => loadConfig(new cdk.App({ context: { idleStopMinutes: 'abc' } }).node)).toThrow();
+  expect(() => loadConfig(new cdk.App({ context: { idleStopMinutes: -1 } }).node)).toThrow();
 });
 
 test('-c codeArtifactCreate=false を読める', () => {

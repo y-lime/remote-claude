@@ -23,6 +23,8 @@ export interface RemoteClaudeConfig {
   readonly claudeHaikuModel: string;
   /** 既定で使うモデル（ANTHROPIC_MODEL）。opus / sonnet / haiku の別名か、推論プロファイルの ID */
   readonly claudeModel: string;
+  /** SSH と SSM の接続がなく、Claude Code も作業していない状態がこの分数続いたら停止する。0 なら止めない */
+  readonly idleStopMinutes: number;
   /** true ならこのアプリで CodeArtifact のドメインとリポジトリを作る。false なら既存のものを使う */
   readonly codeArtifactCreate: boolean;
   readonly codeArtifactDomain: string;
@@ -45,6 +47,11 @@ export function loadConfig(node: Node): RemoteClaudeConfig {
     throw new Error(`context "egress" は ${EGRESS_VALUES.join(' / ')} のいずれか: ${egress}`);
   }
 
+  const idleStopMinutes = Number(node.tryGetContext('idleStopMinutes') ?? 30);
+  if (!Number.isInteger(idleStopMinutes) || idleStopMinutes < 0) {
+    throw new Error(`context "idleStopMinutes" は 0 以上の整数: ${node.tryGetContext('idleStopMinutes')}`);
+  }
+
   const keyPath = node.tryGetContext('sshPublicKeyPath') as string | undefined;
   let sshPublicKey: string | undefined;
   if (keyPath) {
@@ -65,6 +72,7 @@ export function loadConfig(node: Node): RemoteClaudeConfig {
     claudeSonnetModel: node.tryGetContext('claudeSonnetModel') ?? 'jp.anthropic.claude-sonnet-4-6',
     claudeHaikuModel: node.tryGetContext('claudeHaikuModel') ?? 'jp.anthropic.claude-haiku-4-5-20251001-v1:0',
     claudeModel: node.tryGetContext('claudeModel') ?? 'opus',
+    idleStopMinutes,
     // -c codeArtifactCreate=false は文字列で渡ってくる
     codeArtifactCreate: String(node.tryGetContext('codeArtifactCreate') ?? 'true') !== 'false',
     codeArtifactDomain: node.tryGetContext('codeArtifactDomain') ?? 'remote-claude',

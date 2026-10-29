@@ -6,6 +6,7 @@ remote-claude の EC2 上で動かす devcontainer。アプリのリポジトリ
 - Bedrock と CodeArtifact の設定は、EC2 の `/etc/remote-claude/claude.env` を `--env-file` で渡す。AWS の認証情報は IMDS からインスタンスロールのものを取るので、コンテナにキーは置かない
 - Gradle は、EC2 の `/etc/remote-claude/gradle`（CodeArtifact を使う init スクリプト）を `~/.gradle/init.d` にマウントして使う。依存ライブラリのキャッシュは名前付きボリューム `remote-claude-gradle` に置く
 - Claude Code の設定と履歴は、名前付きボリューム `remote-claude-config` に置く。コンテナを作り直しても残り、プロジェクト間で共有する
+- EC2 の `/etc/remote-claude/claude-code` を `/etc/claude-code`（Claude Code の managed settings）にマウントする。中の hook が、Claude Code が作業中かを EC2 に知らせ、EC2 は作業中なら接続がなくても停止しない。このマウントがない古いひな形のコンテナで動かした Claude Code は作業中とみなされないので、ひな形を取り込み直して Rebuild Container する
 
 EC2 の外（手元の Docker Desktop など）では `/etc/remote-claude/claude.env` がないので起動できない。
 

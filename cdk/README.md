@@ -12,8 +12,9 @@ Claude Code を常駐させるリモート環境（AWS EC2 1台）を作る CDK�
 - devcontainer のベースイメージ（`mcr.microsoft.com/devcontainers/base:noble`）を初回起動時に pull しておく。`devcontainer-template` の `image` を変えたら `assets/user-data.sh` もそろえる（テストで確認する）
 - devcontainer に渡す設定（Bedrock と CodeArtifact の環境変数 `/etc/remote-claude/claude.env`、Gradle の init スクリプト `/etc/remote-claude/gradle/`）を置く（`assets/setup-devcontainer.sh`）
 - SSM のシェルは `scripts\remote.cmd shell`（docker グループに入っている ec2-user で開く）を使う
-- CodeArtifact は別スタック `RemoteClaudeArtifactsStack` に作る。EC2 のスタックを消しても残る
+- 使っていなければ自分で停止する（`assets/setup-idle-stop.sh`）。下記
 - 接続は SSM Session Manager だけ（SSH over SSM）。セキュリティグループのインバウンドは全閉
+- CodeArtifact は別スタック `RemoteClaudeArtifactsStack` に作る。EC2 のスタックを消しても残る
 - Claude の認証は Bedrock（インスタンスロール）。IMDSv2 必須、ホップ数 2（devcontainer からロールを使うため）
 - 外向き通信は context の `egress` で切り替える
 
@@ -59,6 +60,20 @@ publishing {
 }
 ```
 
+### 使っていないときの自動停止
+
+次の3つがどれもない状態が `idleStopMinutes`（既定 30分）続くと、EC2 は自分でシャットダウンして停止する。systemd timer（`remote-claude-idle-stop.timer`）が5分ごとに確かめる。
+
+- SSH の接続（VS Code の Remote-SSH を含む）
+- SSM のセッション（`scripts\remote.cmd shell` / `tmux`）
+- 作業中の Claude Code。devcontainer の中の Claude Code が hook（managed settings、`/etc/claude-code`）で、作業の始まり（プロンプトの送信、ツールの実行）と終わり（応答の完了、許可や入力の待ち）を `/run/remote-claude/claude-activity` に書く。tmux で動かしたまま接続を切っても、作業が終わるまでは止まらない
+
+- 許可の確認や入力を待っている Claude Code は、作業していないとみなす（人がいないので、待っていても進まない）
+- 中断などで終わりが記録されなかったセッションは、最後の記録から60分たつと作業していないとみなす
+- 停止すると tmux のセッションと Claude Code のプロセスは終わる。会話は `claude --continue`（または `--resume`）で続きから再開できる
+- 起動直後と初回セットアップ中は止めない。止めたくないときは `-c idleStopMinutes=0`
+- 判定の様子は `journalctl -u remote-claude-idle-stop` で見られる
+
 ### 月額の目安（東京、24時間稼働）
 
 | 項目 | 金額 |
@@ -84,6 +99,7 @@ Bedrock の利用料は含まない。EC2 を止めていても、NAT、エン�
 | `claudeOpusModel` | `global.anthropic.claude-opus-4-6-v1`（jp. がないので global.） |
 | `claudeSonnetModel` | `jp.anthropic.claude-sonnet-4-6` |
 | `claudeHaikuModel` | `jp.anthropic.claude-haiku-4-5-20251001-v1:0` |
+| `idleStopMinutes` | `30`（使っていない状態がこの分数続いたら停止する。0 なら止めない） |
 | `codeArtifactCreate` | `true`（false なら CodeArtifact のスタックを作らず、既存のドメインを使う） |
 | `codeArtifactDomain` | `remote-claude` |
 | `codeArtifactDomainOwner` | なし（スタックのアカウント） |

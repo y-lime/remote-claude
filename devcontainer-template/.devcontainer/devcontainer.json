@@ -22,7 +22,11 @@
     // Gradle が CodeArtifact を見るようにする init スクリプト（EC2 の user data が置く）
     "source=/etc/remote-claude/gradle,target=/home/vscode/.gradle/init.d,type=bind,readonly",
     // 依存ライブラリのキャッシュ。コンテナを作り直しても取り直さない
-    "source=remote-claude-gradle,target=/home/vscode/.gradle/caches,type=volume"
+    "source=remote-claude-gradle,target=/home/vscode/.gradle/caches,type=volume",
+    // Claude Code が作業中かを EC2 に知らせる hook（managed settings）と、その書き込み先。
+    // EC2 は、接続がなく Claude Code も作業していなければ自分で停止する（cdk.json の idleStopMinutes）
+    "source=/etc/remote-claude/claude-code,target=/etc/claude-code,type=bind,readonly",
+    "source=/run/remote-claude/claude-activity,target=/run/remote-claude/claude-activity,type=bind"
   ],
   "containerEnv": { "CLAUDE_CONFIG_DIR": "/home/vscode/.claude" },
   "remoteEnv": { "PATH": "/home/vscode/.local/bin:${containerEnv:PATH}" },

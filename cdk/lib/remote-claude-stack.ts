@@ -110,7 +110,7 @@ export class RemoteClaudeStack extends cdk.Stack {
       + `/maven/${config.codeArtifactRepository}/`;
     const userData = ec2.UserData.forLinux();
     userData.addCommands(
-      [asset('user-data.sh'), asset('setup-devcontainer.sh')].join('\n')
+      [asset('user-data.sh'), asset('setup-devcontainer.sh'), asset('setup-idle-stop.sh')].join('\n')
         .replaceAll('__SSH_PUBLIC_KEY__', config.sshPublicKey ?? '')
         .replaceAll('__AWS_REGION__', this.region)
         .replaceAll('__CLAUDE_MODEL__', config.claudeModel)
@@ -120,6 +120,7 @@ export class RemoteClaudeStack extends cdk.Stack {
         .replaceAll('__CODEARTIFACT_DOMAIN__', config.codeArtifactDomain)
         .replaceAll('__CODEARTIFACT_DOMAIN_OWNER__', caOwner)
         .replaceAll('__CODEARTIFACT_URL__', caUrl)
+        .replaceAll('__IDLE_STOP_MINUTES__', String(config.idleStopMinutes))
         // 置換文字列の $ を特殊文字として扱わせないため関数で渡す
         .replaceAll('__GRADLE_INIT_SCRIPT__', () => asset('codeartifact.init.gradle.kts').trimEnd()),
     );
@@ -138,6 +139,8 @@ export class RemoteClaudeStack extends cdk.Stack {
       userData,
       // user data は初回起動時にしか実行されないので、変えたらインスタンスごと作り直す（EBS も消える）
       userDataCausesReplacement: true,
+      // 使っていないときに中から止める（assets/setup-idle-stop.sh）ので、シャットダウンは終了ではなく停止にする
+      instanceInitiatedShutdownBehavior: ec2.InstanceInitiatedShutdownBehavior.STOP,
       blockDevices: [{
         deviceName: '/dev/xvda',
         volume: ec2.BlockDeviceVolume.ebs(config.volumeSizeGiB, {
