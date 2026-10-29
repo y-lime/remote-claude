@@ -25,11 +25,13 @@
 
 `iamUser` に書いた IAM ユーザーには、ポリシー `RemoteClaudeUser`（タグ `remote-claude:managed=true` の付いた EC2 の起動、停止、SSM での接続）が付く。チーム内で使う前提なので、他のメンバーの EC2 にも入れる。
 
+メンバーは `aws login`（ブラウザでのサインイン）で認証する。アクセスキーは発行しなくてよい。IAM ユーザーにはコンソールのパスワードと、AWS 管理ポリシー `SignInLocalDevelopmentAccess`（`aws login` に要る）を付けておく。
+
 メンバーを外すときは `instances` から消して `npx cdk destroy RemoteClaude-<名前>` を実行する（`cdk deploy --all` ではスタックは消えない）。EBS も一緒に消える。
 
 ## 手元からの操作（`scripts\remote.cmd`）
 
-AWS CLI v2 と Session Manager Plugin が入っていて、`aws sso login` などで認証済みであることが前提。
+AWS CLI v2（2.32.0 以降）と Session Manager Plugin が入っていて、`aws login` で認証済みであることが前提（サインインは最長 12 時間で切れるので、切れたらもう一度 `aws login` を実行する）。
 
 ```powershell
 scripts\remote.cmd start        # 起動し、SSM で接続できるようになるまで待つ

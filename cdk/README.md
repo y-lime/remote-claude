@@ -128,8 +128,8 @@ Claude 5 系は、今のアカウントでは Bedrock の利用規約に同意�
 
 ## 手元（Windows）の準備
 
-1. AWS CLI v2 と Session Manager Plugin を入れる（`session-manager-plugin` が実行できればよい）
-2. `aws sso login` などで認証する
+1. AWS CLI v2（2.32.0 以降）と Session Manager Plugin を入れる（`session-manager-plugin` が実行できればよい）
+2. `aws login` で認証する（ブラウザでサインインする。最長 12 時間で切れるので、切れたらもう一度実行する）
 3. Bedrock コンソールで Anthropic のモデルを有効化しておく（初回のみ）
 
 ## デプロイ

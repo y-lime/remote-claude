@@ -12,15 +12,17 @@ EC2 は使っていないと自動で止まり、接続するときに自動で�
 ## 1. 準備（1回だけ）
 
 1. このフォルダを好きな場所に置く（例：`C:\tools\remote-claude`）。以下、このフォルダで PowerShell を開いて実行する
-2. AWS CLI v2 を入れる：<https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html>
+2. AWS CLI v2（2.32.0 以降）を入れる：<https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html>。`aws --version` で確かめられる
 3. Session Manager Plugin を入れる：<https://docs.aws.amazon.com/systems-manager/latest/userguide/install-plugin-windows.html>
-4. 自分の IAM ユーザーのアクセスキーを、プロファイル `remote-claude` として登録する（リージョンは `__REGION__`）
+4. `aws login` で、自分の IAM ユーザーでサインインする。プロファイル名は `remote-claude`。ブラウザが開くので AWS コンソールと同じようにサインインする。リージョンを聞かれたら `__REGION__` と答える
 
    ```powershell
-   aws configure --profile remote-claude
+   aws login --profile remote-claude
    ```
 
-   別のプロファイル名にしたいときは、環境変数 `AWS_PROFILE` を設定しておけばそちらを使う
+   - サインインは最長 12 時間で切れる。切れたら（`.\remote.cmd` が認証のエラーで止まったら）同じコマンドをもう一度実行する
+   - ブラウザが開かないときは `aws login --profile remote-claude --remote` を実行し、表示された URL を別のブラウザで開く
+   - 別のプロファイル名にしたいときは、環境変数 `AWS_PROFILE` を設定しておけばそちらを使う
 
 5. 確認する。`state` と `ssm` が表示されれば OK（止まっていれば `stopped` と表示される）
 
@@ -28,7 +30,7 @@ EC2 は使っていないと自動で止まり、接続するときに自動で�
    .\remote.cmd status
    ```
 
-   AccessDenied になるときは、キットをくれた人に IAM ユーザー名を伝えて権限を付けてもらう
+   `aws login` や `status` で AccessDenied になるときは、キットをくれた人に IAM ユーザー名を伝えて権限を付けてもらう
 
 ## 2. 使い方
 
@@ -88,6 +90,7 @@ SSH の公開鍵（`~/.ssh/id_ed25519.pub`）をキットをくれた人に渡�
 
 ## 困ったとき
 
+- 認証のエラー（期限切れ、認証情報がない）：`aws login --profile remote-claude` でサインインし直す
 - 接続できない：`.\remote.cmd status` で `state` が `running`、`ssm` が `Online` か確かめる。起動直後は `Online` になるまで1〜2分かかる
 - 初回起動直後は、EC2 のセットアップ（Docker などのインストール）に数分かかる。`sudo cloud-init status --wait` で終わるのを待てる
 - その他はキットをくれた人に聞く（インスタンス ID `__INSTANCE_ID__` を伝える）
